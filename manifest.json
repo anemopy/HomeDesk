@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "Homedeck",
+  "version": "1.0.0",
+  "description": "Your personalized new tab dashboard with custom shortcut grids.",
+  "chrome_url_overrides": {
+    "newtab": "index.html"
+  },
+  "permissions": []
+}

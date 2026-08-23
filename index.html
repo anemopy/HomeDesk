@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Homepage</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Molle:ital@1&family=Mystery+Quest&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <!-- Welcome Modal (first visit) -->
+    <div class="modal-overlay" id="welcome-modal">
+        <div class="modal-card welcome-card">
+            <div class="welcome-icon"><i class="fas fa-rocket"></i></div>
+            <h3 class="modal-title welcome-title">Welcome!</h3>
+            <p class="welcome-subtitle">Let's personalize your homepage</p>
+            <div class="modal-field">
+                <label for="welcome-name">What's your name?</label>
+                <input type="text" id="welcome-name" placeholder="Enter your name…" autocomplete="off" autofocus>
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn confirm" id="welcome-confirm" type="button">Get Started</button>
+            </div>
+        </div>
+    </div>
+
+    <main class="main-layout" id="main-layout">
+        <!-- Top area: grids are rendered dynamically -->
+        <div id="grids-top" class="grids-area"></div>
+
+        <section class="search-section">
+            <div class="search-name" id="search-name"></div>
+            <div class="search-container">
+                <button class="engine-toggle" id="engine-toggle" type="button" title="Switch search engine">
+                    <i class="fab fa-google" id="engine-icon"></i>
+                    <i class="fas fa-caret-down caret"></i>
+                </button>
+                <div class="engine-dropdown" id="engine-dropdown">
+                    <div class="engine-option selected" data-engine="google" data-icon="fab fa-google">
+                        <i class="fab fa-google"></i><span>Google</span>
+                    </div>
+                    <div class="engine-option" data-engine="bing" data-icon="fab fa-microsoft">
+                        <i class="fab fa-microsoft"></i><span>Bing</span>
+                    </div>
+                    <div class="engine-option" data-engine="duckduckgo" data-icon="fas fa-shield-halved">
+                        <i class="fas fa-shield-halved"></i><span>DuckDuckGo</span>
+                    </div>
+                    <div class="engine-option" data-engine="youtube" data-icon="fab fa-youtube">
+                        <i class="fab fa-youtube"></i><span>YouTube</span>
+                    </div>
+                    <div class="engine-option" data-engine="brave" data-icon="fas fa-compass">
+                        <i class="fas fa-compass"></i><span>Brave Search</span>
+                    </div>
+                    <div class="engine-option" data-engine="startpage" data-icon="fas fa-lock">
+                        <i class="fas fa-lock"></i><span>Startpage</span>
+                    </div>
+                </div>
+                <input type="text" id="search-bar" placeholder="Search Google..." autocomplete="off">
+            </div>
+            <div class="search-clock">
+                <div class="clock-time" id="clock-time">00:00:00</div>
+                <div class="clock-date" id="clock-date">01-01-00</div>
+            </div>
+        </section>
+
+        <!-- Bottom area: grids are rendered dynamically -->
+        <div id="grids-bottom" class="grids-area"></div>
+    </main>
+
+    <!-- Add Grid Button (floating) -->
+    <button class="add-grid-btn" id="add-grid-btn" type="button" title="Add a new grid">
+        <i class="fas fa-plus"></i>
+    </button>
+
+    <!-- Add Site Modal -->
+    <div class="modal-overlay" id="add-site-modal">
+        <div class="modal-card">
+            <h3 class="modal-title">Add Shortcut</h3>
+            <div class="modal-field">
+                <label for="modal-url">Website URL</label>
+                <input type="text" id="modal-url" placeholder="https://example.com" autocomplete="off">
+            </div>
+            <div class="modal-field" id="modal-name-field">
+                <label for="modal-name">Display Name</label>
+                <input type="text" id="modal-name" placeholder="Example" autocomplete="off">
+            </div>
+            <div class="modal-field" id="modal-icon-field">
+                <label for="modal-icon">Custom Icon <span class="modal-hint">(Font Awesome class or image URL)</span></label>
+                <input type="text" id="modal-icon" placeholder="e.g. fab fa-github or https://...icon.png" autocomplete="off">
+                <span class="modal-hint">Paste an image URL (right-click tab icon → Copy Image Address) or a FA class</span>
+            </div>
+            <div class="modal-field" id="modal-source-field">
+                <label for="modal-icon-source">Icon Source</label>
+                <select id="modal-icon-source">
+                    <option value="direct" selected>Direct Favicon (Site's Own)</option>
+                    <option value="google">Google FaviconV2</option>
+                    <option value="duckduckgo">DuckDuckGo Icons</option>
+                    <option value="iconhorse">Icon Horse</option>
+                    <option value="clearbit">Clearbit Logo (HD)</option>
+                    <option value="faviconkit">FaviconKit</option>
+                    <option value="yandex">Yandex Favicon</option>
+                    <option value="globe">Globe Icon (fallback)</option>
+                </select>
+                <span class="modal-hint">Choose which service fetches the icon</span>
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn cancel" id="modal-cancel" type="button">Cancel</button>
+                <button class="modal-btn confirm" id="modal-confirm" type="button">Add</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Grid Modal -->
+    <div class="modal-overlay" id="add-grid-modal">
+        <div class="modal-card">
+            <h3 class="modal-title">Add New Grid</h3>
+            <div class="modal-field">
+                <label for="grid-name-input">Grid Name</label>
+                <input type="text" id="grid-name-input" placeholder="e.g. Social, Work, Study…" autocomplete="off">
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn cancel" id="grid-modal-cancel" type="button">Cancel</button>
+                <button class="modal-btn confirm" id="grid-modal-confirm" type="button">Add Grid</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+    <script src="search.js"></script>
+</body>
+
+</html>
