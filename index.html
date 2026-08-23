@@ -72,10 +72,96 @@
         <div id="grids-bottom" class="grids-area"></div>
     </main>
 
+    <!-- Backup & Restore Button (top-left floating) -->
+    <button class="backup-btn" id="backup-btn" type="button" title="Backup & Restore Data">
+        <i class="fas fa-arrow-right-arrow-left"></i>
+    </button>
+
     <!-- Add Grid Button (floating) -->
     <button class="add-grid-btn" id="add-grid-btn" type="button" title="Add a new grid">
         <i class="fas fa-plus"></i>
     </button>
+
+    <!-- Backup & Restore Modal -->
+    <div class="modal-overlay" id="backup-modal">
+        <div class="modal-card backup-modal-card">
+            <div class="modal-header-row">
+                <h3 class="modal-title"><i class="fas fa-database"></i> Backup & Restore</h3>
+                <button class="modal-close-btn" id="backup-modal-close" type="button" title="Close"><i class="fas fa-times"></i></button>
+            </div>
+
+            <!-- Export Section -->
+            <div class="backup-section">
+                <h4 class="backup-section-title"><i class="fas fa-file-export"></i> Export Backup</h4>
+                <p class="backup-section-desc">Download a complete JSON backup of all your grids, shortcuts, custom icons, and profile settings.</p>
+                <div class="backup-action-group">
+                    <button class="modal-btn confirm export-btn" id="export-json-btn" type="button">
+                        <i class="fas fa-download"></i> Download Backup (.json)
+                    </button>
+                    <button class="modal-btn secondary" id="copy-json-btn" type="button" title="Copy JSON text to clipboard">
+                        <i class="fas fa-copy"></i> Copy JSON
+                    </button>
+                </div>
+            </div>
+
+            <div class="backup-divider"></div>
+
+            <!-- Import Section -->
+            <div class="backup-section">
+                <h4 class="backup-section-title"><i class="fas fa-file-import"></i> Restore / Import</h4>
+                <p class="backup-section-desc">Upload or drag & drop a backup JSON file from your computer or another user/browser.</p>
+                
+                <input type="file" id="backup-file-input" accept=".json,application/json" style="display: none;">
+                
+                <div class="backup-dropzone" id="backup-dropzone">
+                    <i class="fas fa-cloud-arrow-up dropzone-icon"></i>
+                    <span class="dropzone-text">Click to browse or drop JSON file here</span>
+                    <span class="dropzone-subtext">Supports HomeDesk backup files (*.json)</span>
+                </div>
+
+                <!-- Preview of selected file -->
+                <div class="backup-preview" id="backup-preview" style="display: none;">
+                    <div class="preview-info">
+                        <i class="fas fa-circle-check preview-icon"></i>
+                        <div class="preview-details">
+                            <span class="preview-filename" id="preview-filename">backup.json</span>
+                            <span class="preview-stats" id="preview-stats">3 Grids • 12 Shortcuts</span>
+                        </div>
+                    </div>
+                    <button class="preview-remove-btn" id="preview-remove-btn" type="button" title="Remove selected file">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+
+                <!-- Import Mode Selection -->
+                <div class="import-mode-container" id="import-mode-container" style="display: none;">
+                    <label class="import-mode-label">Import Mode:</label>
+                    <div class="import-mode-options">
+                        <label class="radio-label">
+                            <input type="radio" name="import-mode" value="replace" checked>
+                            <span><strong>Replace</strong> (Overwrites current data)</span>
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="import-mode" value="merge">
+                            <span><strong>Merge</strong> (Appends to current grids)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="modal-actions import-actions">
+                    <button class="modal-btn confirm" id="import-confirm-btn" type="button" disabled>
+                        <i class="fas fa-rotate-left"></i> Restore Data
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast-notification" id="toast-notification">
+        <i class="toast-icon fas fa-check-circle" id="toast-icon"></i>
+        <span class="toast-message" id="toast-message">Action completed successfully</span>
+    </div>
 
     <!-- Add Site Modal -->
     <div class="modal-overlay" id="add-site-modal">

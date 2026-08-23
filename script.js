@@ -29,11 +29,31 @@
     const gridModalConfirm = document.getElementById('grid-modal-confirm');
     const gridModalCancel = document.getElementById('grid-modal-cancel');
 
+    const backupBtn = document.getElementById('backup-btn');
+    const backupModal = document.getElementById('backup-modal');
+    const backupModalClose = document.getElementById('backup-modal-close');
+    const exportJsonBtn = document.getElementById('export-json-btn');
+    const copyJsonBtn = document.getElementById('copy-json-btn');
+    const backupFileInput = document.getElementById('backup-file-input');
+    const backupDropzone = document.getElementById('backup-dropzone');
+    const backupPreview = document.getElementById('backup-preview');
+    const previewFilename = document.getElementById('preview-filename');
+    const previewStats = document.getElementById('preview-stats');
+    const previewRemoveBtn = document.getElementById('preview-remove-btn');
+    const importModeContainer = document.getElementById('import-mode-container');
+    const importConfirmBtn = document.getElementById('import-confirm-btn');
+
+    const toastEl = document.getElementById('toast-notification');
+    const toastIcon = document.getElementById('toast-icon');
+    const toastMessage = document.getElementById('toast-message');
+
     const gridsTopContainer = document.getElementById('grids-top');
     const gridsBottomContainer = document.getElementById('grids-bottom');
 
     // Track which panel & slot we're adding/editing
     let addTarget = { panelIndex: -1, editIndex: -1 };
+    let pendingImportData = null;
+    let toastTimeout = null;
 
     // ── Data Layer ──────────────────────────────
     function loadData() {
@@ -652,6 +672,275 @@
             if (e.key === 'Escape') closeAddGridModal();
         });
     }
+
+    // ── Toast Helper ─────────────────────────────
+    function showToast(message, type) {
+        if (!toastEl || !toastMessage) return;
+        type = type || 'success';
+        clearTimeout(toastTimeout);
+        toastMessage.textContent = message;
+        toastEl.className = 'toast-notification show ' + type;
+        if (toastIcon) {
+            if (type === 'success') toastIcon.className = 'toast-icon fas fa-check-circle';
+            else if (type === 'error') toastIcon.className = 'toast-icon fas fa-exclamation-circle';
+            else toastIcon.className = 'toast-icon fas fa-info-circle';
+        }
+        toastTimeout = setTimeout(function () {
+            toastEl.classList.remove('show');
+        }, 3200);
+    }
+
+    // ── Backup & Restore ─────────────────────────
+    function openBackupModal() {
+        clearPendingImport();
+        if (backupModal) backupModal.classList.add('open');
+    }
+
+    function closeBackupModal() {
+        if (backupModal) backupModal.classList.remove('open');
+        clearPendingImport();
+    }
+
+    function generateBackupPayload() {
+        var grids = loadData() || [];
+        var userName = getUserName();
+        return {
+            version: 1,
+            app: 'HomeDesk',
+            exportedAt: new Date().toISOString(),
+            userName: userName,
+            grids: grids
+        };
+    }
+
+    function exportBackupFile() {
+        var payload = generateBackupPayload();
+        var jsonStr = JSON.stringify(payload, null, 2);
+        var blob = new Blob([jsonStr], { type: 'application/json' });
+        var url = URL.createObjectURL(blob);
+        var now = new Date();
+        var dateStr = now.toISOString().slice(0, 10);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'homedesk-backup-' + dateStr + '.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('Backup file downloaded!', 'success');
+    }
+
+    function copyBackupToClipboard() {
+        var payload = generateBackupPayload();
+        var jsonStr = JSON.stringify(payload, null, 2);
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(jsonStr).then(function () {
+                showToast('Backup JSON copied to clipboard!', 'success');
+            }).catch(function () {
+                fallbackCopyText(jsonStr);
+            });
+        } else {
+            fallbackCopyText(jsonStr);
+        }
+    }
+
+    function fallbackCopyText(text) {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        try {
+            document.execCommand('copy');
+            showToast('Backup JSON copied to clipboard!', 'success');
+        } catch (err) {
+            showToast('Failed to copy to clipboard', 'error');
+        }
+        document.body.removeChild(ta);
+    }
+
+    function validateAndParseBackup(jsonText) {
+        var parsed;
+        try {
+            parsed = JSON.parse(jsonText);
+        } catch (e) {
+            throw new Error('Invalid JSON file format');
+        }
+
+        var grids = [];
+        var userName = '';
+
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && Array.isArray(parsed.grids)) {
+            grids = parsed.grids;
+            userName = typeof parsed.userName === 'string' ? parsed.userName : '';
+        } else if (Array.isArray(parsed)) {
+            grids = parsed;
+        } else {
+            throw new Error('Unrecognized backup format. Expected grids array or HomeDesk backup.');
+        }
+
+        var sanitizedGrids = [];
+        var totalShortcuts = 0;
+
+        grids.forEach(function (g, idx) {
+            if (!g || typeof g !== 'object') return;
+            var gridName = typeof g.name === 'string' && g.name.trim() ? g.name.trim() : ('Grid ' + (idx + 1));
+            var items = [];
+            if (Array.isArray(g.items)) {
+                g.items.forEach(function (it) {
+                    if (!it || typeof it !== 'object' || !it.url) return;
+                    items.push({
+                        url: String(it.url),
+                        name: it.name ? String(it.name) : 'Shortcut',
+                        icon: it.icon ? String(it.icon) : null,
+                        favicon: it.favicon ? String(it.favicon) : null
+                    });
+                    totalShortcuts++;
+                });
+            }
+            sanitizedGrids.push({
+                name: gridName,
+                items: items
+            });
+        });
+
+        if (sanitizedGrids.length === 0) {
+            throw new Error('Backup contains no valid grids.');
+        }
+
+        return {
+            userName: userName,
+            grids: sanitizedGrids,
+            totalGrids: sanitizedGrids.length,
+            totalShortcuts: totalShortcuts
+        };
+    }
+
+    function handleFileSelection(file) {
+        if (!file) return;
+        if (!file.name.toLowerCase().endsWith('.json') && file.type !== 'application/json' && file.type !== '') {
+            showToast('Please select a valid .json file', 'error');
+            return;
+        }
+
+        var reader = new FileReader();
+        reader.onload = function (e) {
+            try {
+                var result = validateAndParseBackup(e.target.result);
+                pendingImportData = result;
+
+                if (previewFilename) previewFilename.textContent = file.name;
+                if (previewStats) {
+                    var statsText = result.totalGrids + ' Grid' + (result.totalGrids === 1 ? '' : 's') + ' • ' + result.totalShortcuts + ' Shortcut' + (result.totalShortcuts === 1 ? '' : 's');
+                    if (result.userName) {
+                        statsText += ' • User: ' + result.userName;
+                    }
+                    previewStats.textContent = statsText;
+                }
+
+                if (backupDropzone) backupDropzone.style.display = 'none';
+                if (backupPreview) backupPreview.style.display = 'flex';
+                if (importModeContainer) importModeContainer.style.display = 'block';
+                if (importConfirmBtn) importConfirmBtn.disabled = false;
+            } catch (err) {
+                showToast(err.message || 'Failed to read backup file', 'error');
+                clearPendingImport();
+            }
+        };
+        reader.onerror = function () {
+            showToast('Error reading backup file', 'error');
+            clearPendingImport();
+        };
+        reader.readAsText(file);
+    }
+
+    function clearPendingImport() {
+        pendingImportData = null;
+        if (backupFileInput) backupFileInput.value = '';
+        if (backupDropzone) backupDropzone.style.display = 'flex';
+        if (backupPreview) backupPreview.style.display = 'none';
+        if (importModeContainer) importModeContainer.style.display = 'none';
+        if (importConfirmBtn) importConfirmBtn.disabled = true;
+    }
+
+    function applyImport() {
+        if (!pendingImportData) return;
+
+        var modeInput = document.querySelector('input[name="import-mode"]:checked');
+        var mode = modeInput ? modeInput.value : 'replace';
+
+        if (mode === 'replace') {
+            saveData(pendingImportData.grids);
+            if (pendingImportData.userName) {
+                setUserName(pendingImportData.userName);
+                applyUserName(pendingImportData.userName);
+            }
+        } else {
+            var currentData = loadData() || [];
+            var merged = currentData.concat(pendingImportData.grids);
+            saveData(merged);
+            if (!getUserName() && pendingImportData.userName) {
+                setUserName(pendingImportData.userName);
+                applyUserName(pendingImportData.userName);
+            }
+        }
+
+        renderAllGrids();
+        cacheAllFavicons();
+        closeBackupModal();
+        showToast('Restored ' + pendingImportData.totalGrids + ' grid(s) and ' + pendingImportData.totalShortcuts + ' shortcut(s)!', 'success');
+    }
+
+    // Backup & Restore Events
+    if (backupBtn) backupBtn.addEventListener('click', openBackupModal);
+    if (backupModalClose) backupModalClose.addEventListener('click', closeBackupModal);
+    if (exportJsonBtn) exportJsonBtn.addEventListener('click', exportBackupFile);
+    if (copyJsonBtn) copyJsonBtn.addEventListener('click', copyBackupToClipboard);
+    if (importConfirmBtn) importConfirmBtn.addEventListener('click', applyImport);
+    if (previewRemoveBtn) previewRemoveBtn.addEventListener('click', clearPendingImport);
+
+    if (backupDropzone && backupFileInput) {
+        backupDropzone.addEventListener('click', function () {
+            backupFileInput.click();
+        });
+
+        backupFileInput.addEventListener('change', function () {
+            if (backupFileInput.files && backupFileInput.files[0]) {
+                handleFileSelection(backupFileInput.files[0]);
+            }
+        });
+
+        backupDropzone.addEventListener('dragover', function (e) {
+            e.preventDefault();
+            backupDropzone.classList.add('drag-over');
+        });
+
+        backupDropzone.addEventListener('dragleave', function () {
+            backupDropzone.classList.remove('drag-over');
+        });
+
+        backupDropzone.addEventListener('drop', function (e) {
+            e.preventDefault();
+            backupDropzone.classList.remove('drag-over');
+            if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+                handleFileSelection(e.dataTransfer.files[0]);
+            }
+        });
+    }
+
+    if (backupModal) {
+        backupModal.addEventListener('click', function (e) {
+            if (e.target === backupModal) closeBackupModal();
+        });
+    }
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && backupModal && backupModal.classList.contains('open')) {
+            closeBackupModal();
+        }
+    });
 
     // ── Clock ────────────────────────────────────
     function initClock() {
