@@ -1,12 +1,12 @@
-// Multi-engine Google Search with dropdown
+// Multi-engine Search with Dropdown
 (function () {
     const engines = {
-        google:     { name: 'Google',      url: 'https://www.google.com/search?q=' },
-        bing:       { name: 'Bing',        url: 'https://www.bing.com/search?q=' },
-        duckduckgo: { name: 'DuckDuckGo',  url: 'https://duckduckgo.com/?q=' },
-        youtube:    { name: 'YouTube',      url: 'https://www.youtube.com/results?search_query=' },
-        brave:      { name: 'Brave Search', url: 'https://search.brave.com/search?q=' },
-        startpage:  { name: 'Startpage',   url: 'https://www.startpage.com/do/dsearch?query=' },
+        google:     { name: 'Google',      url: 'https://www.google.com/search?q=', icon: 'fab fa-google' },
+        bing:       { name: 'Bing',        url: 'https://www.bing.com/search?q=', icon: 'fab fa-microsoft' },
+        duckduckgo: { name: 'DuckDuckGo',  url: 'https://duckduckgo.com/?q=', icon: 'fas fa-shield-halved' },
+        youtube:    { name: 'YouTube',      url: 'https://www.youtube.com/results?search_query=', icon: 'fab fa-youtube' },
+        brave:      { name: 'Brave Search', url: 'https://search.brave.com/search?q=', icon: 'fas fa-compass' },
+        startpage:  { name: 'Startpage',   url: 'https://www.startpage.com/do/dsearch?query=', icon: 'fas fa-lock' },
     };
 
     let currentEngine = 'google';
@@ -19,6 +19,48 @@
 
     if (!searchInput || !toggle || !dropdown) return;
 
+    function getSettings() {
+        try {
+            return JSON.parse(localStorage.getItem('homepage-settings') || '{}');
+        } catch (e) {
+            return {};
+        }
+    }
+
+    function selectEngine(engineKey) {
+        if (!engines[engineKey]) engineKey = 'google';
+        currentEngine = engineKey;
+
+        if (engineIcon) {
+            engineIcon.className = engines[currentEngine].icon;
+            engineIcon.id = 'engine-icon';
+        }
+
+        options.forEach(function (o) {
+            if (o.dataset.engine === currentEngine) {
+                o.classList.add('selected');
+            } else {
+                o.classList.remove('selected');
+            }
+        });
+
+        searchInput.placeholder = 'Search ' + engines[currentEngine].name + '...';
+        dropdown.classList.remove('open');
+        toggle.classList.remove('open');
+
+        // Persist as default engine in settings
+        try {
+            var settings = JSON.parse(localStorage.getItem('homepage-settings') || '{}');
+            settings.defaultEngine = engineKey;
+            localStorage.setItem('homepage-settings', JSON.stringify(settings));
+            // Sync settings modal dropdown if it exists
+            var settingSelect = document.getElementById('setting-default-engine');
+            if (settingSelect) settingSelect.value = engineKey;
+        } catch (e) { /* ignore */ }
+    }
+
+    window.setSearchEngine = selectEngine;
+
     // Toggle dropdown open / close
     toggle.addEventListener('click', function (e) {
         e.stopPropagation();
@@ -26,28 +68,11 @@
         toggle.classList.toggle('open', isOpen);
     });
 
-    // Select an engine
+    // Select an engine from dropdown
     options.forEach(function (opt) {
         opt.addEventListener('click', function (e) {
             e.stopPropagation();
-            currentEngine = opt.dataset.engine;
-
-            // Update icon
-            engineIcon.className = opt.dataset.icon;
-            engineIcon.id = 'engine-icon';
-
-            // Update selected state
-            options.forEach(function (o) { o.classList.remove('selected'); });
-            opt.classList.add('selected');
-
-            // Update placeholder
-            searchInput.placeholder = 'Search ' + engines[currentEngine].name + '...';
-
-            // Close dropdown
-            dropdown.classList.remove('open');
-            toggle.classList.remove('open');
-
-            // Focus the search bar
+            selectEngine(opt.dataset.engine);
             searchInput.focus();
         });
     });
@@ -59,9 +84,9 @@
     });
 
     // Search on Enter
-    searchInput.addEventListener('keypress', function (e) {
+    searchInput.addEventListener('keydown', function (e) {
         if (e.key === 'Enter') {
-            const query = searchInput.value.trim();
+            var query = searchInput.value.trim();
             if (query) {
                 window.location.href = engines[currentEngine].url + encodeURIComponent(query);
             }
@@ -70,8 +95,14 @@
 
     // Type-to-search: focus input when typing anywhere
     document.addEventListener('keydown', function (e) {
-        if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+        if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'SELECT') return;
         if (e.ctrlKey || e.altKey || e.metaKey || e.key.length > 1) return;
         searchInput.focus();
     });
+
+    // Init initial engine from settings
+    const initialSettings = getSettings();
+    if (initialSettings.defaultEngine) {
+        selectEngine(initialSettings.defaultEngine);
+    }
 })();

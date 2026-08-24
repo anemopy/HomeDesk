@@ -5,6 +5,19 @@
     const MAX_ITEMS = 9;
     const STORAGE_KEY = 'homepage-grid-data';
     const USER_KEY = 'homepage-user-name';
+    const WALLPAPER_KEY = 'homepage-custom-wallpaper';
+    const SETTINGS_KEY = 'homepage-settings';
+
+    const DEFAULT_SETTINGS = {
+        wallpaperDim: 20,
+        wallpaperBlur: 0,
+        tileShape: 'circle',
+        timeFormat: '24h',
+        showSeconds: true,
+        dateFormat: 'dd/mm/yy',
+        defaultEngine: 'google',
+        showLabels: true
+    };
 
     // ── DOM References ───────────────────────────
     const modal = document.getElementById('add-site-modal');
@@ -33,15 +46,36 @@
     const backupModal = document.getElementById('backup-modal');
     const backupModalClose = document.getElementById('backup-modal-close');
     const exportJsonBtn = document.getElementById('export-json-btn');
+    const importJsonBtn = document.getElementById('import-json-btn');
     const copyJsonBtn = document.getElementById('copy-json-btn');
     const backupFileInput = document.getElementById('backup-file-input');
-    const backupDropzone = document.getElementById('backup-dropzone');
     const backupPreview = document.getElementById('backup-preview');
     const previewFilename = document.getElementById('preview-filename');
     const previewStats = document.getElementById('preview-stats');
     const previewRemoveBtn = document.getElementById('preview-remove-btn');
     const importModeContainer = document.getElementById('import-mode-container');
     const importConfirmBtn = document.getElementById('import-confirm-btn');
+
+    const wallpaperThumb = document.getElementById('wallpaper-thumb');
+    const wallpaperFileInput = document.getElementById('wallpaper-file-input');
+    const wallpaperUploadBtn = document.getElementById('wallpaper-upload-btn');
+    const wallpaperResetBtn = document.getElementById('wallpaper-reset-btn');
+
+    // Settings Controls
+    const settingBgDim = document.getElementById('setting-bg-dim');
+    const bgDimLabel = document.getElementById('bg-dim-label');
+    const settingBgBlur = document.getElementById('setting-bg-blur');
+    const bgBlurLabel = document.getElementById('bg-blur-label');
+    const tileShapeGroup = document.getElementById('tile-shape-group');
+    const settingShowLabels = document.getElementById('setting-show-labels');
+    const settingUserName = document.getElementById('setting-user-name');
+    const settingNameSaveBtn = document.getElementById('setting-name-save-btn');
+    const timeFormatGroup = document.getElementById('time-format-group');
+    const settingShowSeconds = document.getElementById('setting-show-seconds');
+    const settingDateFormat = document.getElementById('setting-date-format');
+    const settingDefaultEngine = document.getElementById('setting-default-engine');
+
+    const factoryResetBtn = document.getElementById('factory-reset-btn');
 
     const toastEl = document.getElementById('toast-notification');
     const toastIcon = document.getElementById('toast-icon');
@@ -274,6 +308,32 @@
             }
 
             div.appendChild(a);
+
+            // Single-click opens in current tab, double-click opens in new tab
+            (function (linkUrl) {
+                var clickTimer = null;
+                a.addEventListener('click', function (e) {
+                    if (editing) {
+                        e.preventDefault();
+                        return;
+                    }
+                    e.preventDefault();
+                    if (clickTimer === null) {
+                        clickTimer = setTimeout(function () {
+                            clickTimer = null;
+                            window.location.href = linkUrl;
+                        }, 240);
+                    }
+                });
+
+                a.addEventListener('dblclick', function (e) {
+                    if (editing) return;
+                    e.preventDefault();
+                    clearTimeout(clickTimer);
+                    clickTimer = null;
+                    window.open(linkUrl, '_blank');
+                });
+            })(item.url);
 
             // Right-click to edit
             (function (pi, si) {
@@ -690,9 +750,184 @@
         }, 3200);
     }
 
+    // ── Wallpaper Management ──────────────────────
+    function loadWallpaper() {
+        return localStorage.getItem(WALLPAPER_KEY) || 'bg.jpg';
+    }
+
+    function applyWallpaper(url) {
+        if (!url) url = 'bg.jpg';
+        document.body.style.backgroundImage = 'url("' + url + '")';
+        if (wallpaperThumb) {
+            wallpaperThumb.src = url;
+        }
+    }
+
+    function saveWallpaper(url) {
+        localStorage.setItem(WALLPAPER_KEY, url);
+        applyWallpaper(url);
+    }
+
+    function resetWallpaper() {
+        localStorage.removeItem(WALLPAPER_KEY);
+        applyWallpaper('bg.jpg');
+        showToast('Wallpaper reset to default', 'info');
+    }
+
+    function processWallpaperImage(file) {
+        if (!file) return;
+        if (!file.type || file.type.indexOf('image/') !== 0) {
+            showToast('Please select an image file (JPG, PNG, WebP)', 'error');
+            return;
+        }
+
+        var reader = new FileReader();
+        reader.onload = function (e) {
+            var img = new Image();
+            img.onload = function () {
+                try {
+                    var maxDimension = 2560;
+                    var width = img.naturalWidth;
+                    var height = img.naturalHeight;
+
+                    if (width > maxDimension || height > maxDimension) {
+                        if (width > height) {
+                            height = Math.round((height * maxDimension) / width);
+                            width = maxDimension;
+                        } else {
+                            width = Math.round((width * maxDimension) / height);
+                            height = maxDimension;
+                        }
+                    }
+
+                    var canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+                    var ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                    saveWallpaper(dataUrl);
+                    showToast('Wallpaper updated successfully!', 'success');
+                } catch (err) {
+                    saveWallpaper(e.target.result);
+                    showToast('Wallpaper updated!', 'success');
+                }
+            };
+            img.onerror = function () {
+                showToast('Failed to load image file', 'error');
+            };
+            img.src = e.target.result;
+        };
+        reader.onerror = function () {
+            showToast('Error reading image file', 'error');
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // ── Settings Management ──────────────────────
+    function loadSettings() {
+        try {
+            var stored = localStorage.getItem(SETTINGS_KEY);
+            return stored ? Object.assign({}, DEFAULT_SETTINGS, JSON.parse(stored)) : Object.assign({}, DEFAULT_SETTINGS);
+        } catch (e) {
+            return Object.assign({}, DEFAULT_SETTINGS);
+        }
+    }
+
+    function saveSettings(settings) {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+        applyAllSettings(settings);
+    }
+
+    function applyAllSettings(settings) {
+        if (!settings) settings = loadSettings();
+
+        // 1. Background Dim & Blur
+        var dimRatio = (settings.wallpaperDim / 100).toFixed(2);
+        document.documentElement.style.setProperty('--bg-dim', dimRatio);
+        document.documentElement.style.setProperty('--bg-blur', settings.wallpaperBlur + 'px');
+
+        // 2. Tile Shape
+        var radius = '50%';
+        if (settings.tileShape === 'squircle') radius = '14px';
+        else if (settings.tileShape === 'square') radius = '4px';
+        document.documentElement.style.setProperty('--tile-radius', radius);
+
+        // 3. Shortcut Labels
+        if (settings.showLabels === false) {
+            document.body.classList.add('hide-shortcut-labels');
+        } else {
+            document.body.classList.remove('hide-shortcut-labels');
+        }
+
+        // 4. Default Search Engine
+        if (window.setSearchEngine && settings.defaultEngine) {
+            window.setSearchEngine(settings.defaultEngine);
+        }
+    }
+
+    function syncSettingsUI(settings) {
+        if (!settings) settings = loadSettings();
+
+        if (settingBgDim) {
+            settingBgDim.value = settings.wallpaperDim;
+            if (bgDimLabel) bgDimLabel.textContent = settings.wallpaperDim + '%';
+        }
+        if (settingBgBlur) {
+            settingBgBlur.value = settings.wallpaperBlur;
+            if (bgBlurLabel) bgBlurLabel.textContent = settings.wallpaperBlur + 'px';
+        }
+
+        if (tileShapeGroup) {
+            var shapeBtns = tileShapeGroup.querySelectorAll('.segment-btn');
+            shapeBtns.forEach(function (btn) {
+                if (btn.dataset.shape === settings.tileShape) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+        }
+
+        if (settingShowLabels) settingShowLabels.checked = (settings.showLabels !== false);
+        if (settingUserName) settingUserName.value = getUserName();
+
+        if (timeFormatGroup) {
+            var timeBtns = timeFormatGroup.querySelectorAll('.segment-btn');
+            timeBtns.forEach(function (btn) {
+                if (btn.dataset.time === settings.timeFormat) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+        }
+
+        if (settingShowSeconds) settingShowSeconds.checked = (settings.showSeconds !== false);
+        if (settingDateFormat) settingDateFormat.value = settings.dateFormat || 'dd/mm/yy';
+        if (settingDefaultEngine) settingDefaultEngine.value = settings.defaultEngine || 'google';
+    }
+
+    function handleFactoryReset() {
+        if (!confirm('⚠️ Are you sure you want to reset HomeDesk to factory defaults?\n\nThis will clear all shortcuts, custom grids, wallpapers, and personalized settings.')) {
+            return;
+        }
+        localStorage.clear();
+        showToast('Dashboard reset to factory defaults', 'info');
+        setTimeout(function () {
+            window.location.reload();
+        }, 400);
+    }
+
     // ── Backup & Restore ─────────────────────────
     function openBackupModal() {
         clearPendingImport();
+        var currentSettings = loadSettings();
+        syncSettingsUI(currentSettings);
+        if (wallpaperThumb) {
+            wallpaperThumb.src = loadWallpaper();
+        }
         if (backupModal) backupModal.classList.add('open');
     }
 
@@ -704,11 +939,15 @@
     function generateBackupPayload() {
         var grids = loadData() || [];
         var userName = getUserName();
+        var customWallpaper = localStorage.getItem(WALLPAPER_KEY) || null;
+        var settings = loadSettings();
         return {
             version: 1,
             app: 'HomeDesk',
             exportedAt: new Date().toISOString(),
             userName: userName,
+            wallpaper: customWallpaper,
+            settings: settings,
             grids: grids
         };
     }
@@ -771,10 +1010,14 @@
 
         var grids = [];
         var userName = '';
+        var wallpaper = null;
+        var settings = null;
 
         if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && Array.isArray(parsed.grids)) {
             grids = parsed.grids;
             userName = typeof parsed.userName === 'string' ? parsed.userName : '';
+            wallpaper = typeof parsed.wallpaper === 'string' ? parsed.wallpaper : null;
+            settings = (parsed.settings && typeof parsed.settings === 'object') ? parsed.settings : null;
         } else if (Array.isArray(parsed)) {
             grids = parsed;
         } else {
@@ -812,6 +1055,8 @@
 
         return {
             userName: userName,
+            wallpaper: wallpaper,
+            settings: settings,
             grids: sanitizedGrids,
             totalGrids: sanitizedGrids.length,
             totalShortcuts: totalShortcuts
@@ -840,7 +1085,6 @@
                     previewStats.textContent = statsText;
                 }
 
-                if (backupDropzone) backupDropzone.style.display = 'none';
                 if (backupPreview) backupPreview.style.display = 'flex';
                 if (importModeContainer) importModeContainer.style.display = 'block';
                 if (importConfirmBtn) importConfirmBtn.disabled = false;
@@ -859,10 +1103,9 @@
     function clearPendingImport() {
         pendingImportData = null;
         if (backupFileInput) backupFileInput.value = '';
-        if (backupDropzone) backupDropzone.style.display = 'flex';
         if (backupPreview) backupPreview.style.display = 'none';
         if (importModeContainer) importModeContainer.style.display = 'none';
-        if (importConfirmBtn) importConfirmBtn.disabled = true;
+        if (importConfirmBtn) importConfirmBtn.disabled = false;
     }
 
     function applyImport() {
@@ -877,6 +1120,12 @@
                 setUserName(pendingImportData.userName);
                 applyUserName(pendingImportData.userName);
             }
+            if (pendingImportData.wallpaper) {
+                saveWallpaper(pendingImportData.wallpaper);
+            }
+            if (pendingImportData.settings) {
+                saveSettings(pendingImportData.settings);
+            }
         } else {
             var currentData = loadData() || [];
             var merged = currentData.concat(pendingImportData.grids);
@@ -884,6 +1133,9 @@
             if (!getUserName() && pendingImportData.userName) {
                 setUserName(pendingImportData.userName);
                 applyUserName(pendingImportData.userName);
+            }
+            if (!localStorage.getItem(WALLPAPER_KEY) && pendingImportData.wallpaper) {
+                saveWallpaper(pendingImportData.wallpaper);
             }
         }
 
@@ -893,7 +1145,148 @@
         showToast('Restored ' + pendingImportData.totalGrids + ' grid(s) and ' + pendingImportData.totalShortcuts + ' shortcut(s)!', 'success');
     }
 
-    // Backup & Restore Events
+    // ── Wallpaper Events ─────────────────────────
+    if (wallpaperUploadBtn && wallpaperFileInput) {
+        wallpaperUploadBtn.addEventListener('click', function () {
+            wallpaperFileInput.click();
+        });
+
+        wallpaperFileInput.addEventListener('change', function () {
+            if (wallpaperFileInput.files && wallpaperFileInput.files[0]) {
+                processWallpaperImage(wallpaperFileInput.files[0]);
+                wallpaperFileInput.value = '';
+            }
+        });
+    }
+
+    if (wallpaperResetBtn) {
+        wallpaperResetBtn.addEventListener('click', resetWallpaper);
+    }
+
+    // ── Settings Events ──────────────────────────
+    // Dim slider
+    if (settingBgDim) {
+        settingBgDim.addEventListener('input', function () {
+            var val = parseInt(settingBgDim.value, 10);
+            if (bgDimLabel) bgDimLabel.textContent = val + '%';
+            var s = loadSettings();
+            s.wallpaperDim = val;
+            saveSettings(s);
+        });
+    }
+
+    // Blur slider
+    if (settingBgBlur) {
+        settingBgBlur.addEventListener('input', function () {
+            var val = parseInt(settingBgBlur.value, 10);
+            if (bgBlurLabel) bgBlurLabel.textContent = val + 'px';
+            var s = loadSettings();
+            s.wallpaperBlur = val;
+            saveSettings(s);
+        });
+    }
+
+    // Tile shape segment group
+    if (tileShapeGroup) {
+        var shapeBtns = tileShapeGroup.querySelectorAll('.segment-btn');
+        shapeBtns.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var shape = btn.dataset.shape;
+                var s = loadSettings();
+                s.tileShape = shape;
+                saveSettings(s);
+                shapeBtns.forEach(function (b) { b.classList.remove('active'); });
+                btn.classList.add('active');
+            });
+        });
+    }
+
+    // Show labels toggle
+    if (settingShowLabels) {
+        settingShowLabels.addEventListener('change', function () {
+            var s = loadSettings();
+            s.showLabels = settingShowLabels.checked;
+            saveSettings(s);
+        });
+    }
+
+    // Display name save
+    function saveNameFromSettings() {
+        if (!settingUserName) return;
+        var newName = settingUserName.value.trim();
+        if (newName) {
+            setUserName(newName);
+            applyUserName(newName);
+            showToast('Display name updated!', 'success');
+        } else {
+            showToast('Please enter a valid name', 'error');
+        }
+    }
+
+    if (settingNameSaveBtn) {
+        settingNameSaveBtn.addEventListener('click', saveNameFromSettings);
+    }
+    if (settingUserName) {
+        settingUserName.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') saveNameFromSettings();
+        });
+    }
+
+    // Time format segment group
+    if (timeFormatGroup) {
+        var timeBtns = timeFormatGroup.querySelectorAll('.segment-btn');
+        timeBtns.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var tf = btn.dataset.time;
+                var s = loadSettings();
+                s.timeFormat = tf;
+                saveSettings(s);
+                timeBtns.forEach(function (b) { b.classList.remove('active'); });
+                btn.classList.add('active');
+            });
+        });
+    }
+
+    // Show seconds toggle
+    if (settingShowSeconds) {
+        settingShowSeconds.addEventListener('change', function () {
+            var s = loadSettings();
+            s.showSeconds = settingShowSeconds.checked;
+            saveSettings(s);
+        });
+    }
+
+    // Date format select
+    if (settingDateFormat) {
+        settingDateFormat.addEventListener('change', function () {
+            var s = loadSettings();
+            s.dateFormat = settingDateFormat.value;
+            saveSettings(s);
+        });
+    }
+
+    // Default engine select
+    if (settingDefaultEngine) {
+        settingDefaultEngine.addEventListener('change', function () {
+            var s = loadSettings();
+            s.defaultEngine = settingDefaultEngine.value;
+            saveSettings(s);
+            if (window.setSearchEngine) {
+                window.setSearchEngine(s.defaultEngine);
+            }
+        });
+    }
+
+
+
+
+
+    // Factory reset button
+    if (factoryResetBtn) {
+        factoryResetBtn.addEventListener('click', handleFactoryReset);
+    }
+
+    // ── Backup & Restore Events ───────────────────
     if (backupBtn) backupBtn.addEventListener('click', openBackupModal);
     if (backupModalClose) backupModalClose.addEventListener('click', closeBackupModal);
     if (exportJsonBtn) exportJsonBtn.addEventListener('click', exportBackupFile);
@@ -901,31 +1294,16 @@
     if (importConfirmBtn) importConfirmBtn.addEventListener('click', applyImport);
     if (previewRemoveBtn) previewRemoveBtn.addEventListener('click', clearPendingImport);
 
-    if (backupDropzone && backupFileInput) {
-        backupDropzone.addEventListener('click', function () {
+    if (importJsonBtn && backupFileInput) {
+        importJsonBtn.addEventListener('click', function () {
             backupFileInput.click();
         });
+    }
 
+    if (backupFileInput) {
         backupFileInput.addEventListener('change', function () {
             if (backupFileInput.files && backupFileInput.files[0]) {
                 handleFileSelection(backupFileInput.files[0]);
-            }
-        });
-
-        backupDropzone.addEventListener('dragover', function (e) {
-            e.preventDefault();
-            backupDropzone.classList.add('drag-over');
-        });
-
-        backupDropzone.addEventListener('dragleave', function () {
-            backupDropzone.classList.remove('drag-over');
-        });
-
-        backupDropzone.addEventListener('drop', function (e) {
-            e.preventDefault();
-            backupDropzone.classList.remove('drag-over');
-            if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
-                handleFileSelection(e.dataTransfer.files[0]);
             }
         });
     }
@@ -933,6 +1311,17 @@
     if (backupModal) {
         backupModal.addEventListener('click', function (e) {
             if (e.target === backupModal) closeBackupModal();
+        });
+
+        backupModal.addEventListener('dragover', function (e) {
+            e.preventDefault();
+        });
+
+        backupModal.addEventListener('drop', function (e) {
+            e.preventDefault();
+            if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+                handleFileSelection(e.dataTransfer.files[0]);
+            }
         });
     }
 
@@ -949,16 +1338,44 @@
         if (!timeEl || !dateEl) return;
 
         function updateClock() {
+            var settings = loadSettings();
             var now = new Date();
-            var hours = String(now.getHours()).padStart(2, '0');
+
+            var hours = now.getHours();
             var minutes = String(now.getMinutes()).padStart(2, '0');
             var seconds = String(now.getSeconds()).padStart(2, '0');
-            timeEl.textContent = hours + ':' + minutes + ':' + seconds;
+            var ampm = '';
+
+            if (settings.timeFormat === '12h') {
+                ampm = hours >= 12 ? ' PM' : ' AM';
+                hours = hours % 12;
+                hours = hours ? hours : 12; // 0 becomes 12
+            }
+            var hoursStr = String(hours).padStart(2, '0');
+
+            var timeStr = hoursStr + ':' + minutes;
+            if (settings.showSeconds !== false) {
+                timeStr += ':' + seconds;
+            }
+            timeStr += ampm;
+            timeEl.textContent = timeStr;
 
             var day = String(now.getDate()).padStart(2, '0');
             var month = String(now.getMonth() + 1).padStart(2, '0');
             var year = String(now.getFullYear()).slice(-2);
-            dateEl.textContent = day + '/' + month + '/' + year;
+
+            var dateStr = '';
+            if (settings.dateFormat === 'mm/dd/yy') {
+                dateStr = month + '/' + day + '/' + year;
+            } else if (settings.dateFormat === 'text') {
+                var days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                dateStr = days[now.getDay()] + ', ' + day + ' ' + months[now.getMonth()];
+            } else {
+                // dd/mm/yy default
+                dateStr = day + '/' + month + '/' + year;
+            }
+            dateEl.textContent = dateStr;
         }
 
         updateClock();
@@ -1008,6 +1425,13 @@
 
     // ── Init ─────────────────────────────────────
     function init() {
+        // Load and apply all user settings
+        var settings = loadSettings();
+        applyAllSettings(settings);
+
+        // Load custom wallpaper if set
+        applyWallpaper(loadWallpaper());
+
         var userName = getUserName();
 
         // First visit: show welcome modal

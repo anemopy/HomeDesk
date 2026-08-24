@@ -13,6 +13,9 @@
 </head>
 
 <body>
+    <!-- Background Dim & Blur Overlay -->
+    <div id="bg-overlay" class="bg-overlay"></div>
+
     <!-- Welcome Modal (first visit) -->
     <div class="modal-overlay" id="welcome-modal">
         <div class="modal-card welcome-card">
@@ -61,6 +64,7 @@
                     </div>
                 </div>
                 <input type="text" id="search-bar" placeholder="Search Google..." autocomplete="off">
+
             </div>
             <div class="search-clock">
                 <div class="clock-time" id="clock-time">00:00:00</div>
@@ -72,51 +76,206 @@
         <div id="grids-bottom" class="grids-area"></div>
     </main>
 
-    <!-- Backup & Restore Button (top-left floating) -->
-    <button class="backup-btn" id="backup-btn" type="button" title="Backup & Restore Data">
-        <i class="fas fa-arrow-right-arrow-left"></i>
+    <!-- Settings Button (top-left floating) -->
+    <button class="backup-btn" id="backup-btn" type="button" title="Settings">
+        <i class="fas fa-gear"></i>
     </button>
+
 
     <!-- Add Grid Button (floating) -->
     <button class="add-grid-btn" id="add-grid-btn" type="button" title="Add a new grid">
         <i class="fas fa-plus"></i>
     </button>
 
-    <!-- Backup & Restore Modal -->
+    <!-- Settings Modal -->
     <div class="modal-overlay" id="backup-modal">
         <div class="modal-card backup-modal-card">
             <div class="modal-header-row">
-                <h3 class="modal-title"><i class="fas fa-database"></i> Backup & Restore</h3>
+                <h3 class="modal-title"><i class="fas fa-gear"></i> Settings</h3>
                 <button class="modal-close-btn" id="backup-modal-close" type="button" title="Close"><i class="fas fa-times"></i></button>
             </div>
 
-            <!-- Export Section -->
-            <div class="backup-section">
-                <h4 class="backup-section-title"><i class="fas fa-file-export"></i> Export Backup</h4>
-                <p class="backup-section-desc">Download a complete JSON backup of all your grids, shortcuts, custom icons, and profile settings.</p>
-                <div class="backup-action-group">
-                    <button class="modal-btn confirm export-btn" id="export-json-btn" type="button">
-                        <i class="fas fa-download"></i> Download Backup (.json)
-                    </button>
-                    <button class="modal-btn secondary" id="copy-json-btn" type="button" title="Copy JSON text to clipboard">
-                        <i class="fas fa-copy"></i> Copy JSON
-                    </button>
+            <!-- 1. Appearance Section -->
+            <div class="settings-section">
+                <h4 class="settings-section-title"><i class="fas fa-palette"></i> Appearance</h4>
+                
+                <!-- Wallpaper -->
+                <div class="settings-row">
+                    <div class="wallpaper-preview-group">
+                        <img id="wallpaper-thumb" src="bg.jpg" alt="Wallpaper preview" class="wallpaper-thumb">
+                        <div class="wallpaper-info">
+                            <span class="wallpaper-label">Wallpaper</span>
+                            <span class="wallpaper-hint">JPG, PNG, WebP</span>
+                        </div>
+                    </div>
+                    <div class="settings-action-group">
+                        <input type="file" id="wallpaper-file-input" accept="image/*" style="display: none;">
+                        <button class="modal-btn secondary btn-compact" id="wallpaper-upload-btn" type="button">
+                            <i class="fas fa-upload"></i> Upload
+                        </button>
+                        <button class="modal-btn ghost btn-compact" id="wallpaper-reset-btn" type="button" title="Reset to default background">
+                            <i class="fas fa-rotate-left"></i> Reset
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Wallpaper Dim & Blur Sliders -->
+                <div class="settings-row">
+                    <div class="settings-info-group">
+                        <span class="settings-row-label">Background Dim</span>
+                        <span class="settings-row-hint" id="bg-dim-label">20%</span>
+                    </div>
+                    <div class="setting-range-wrap">
+                        <input type="range" id="setting-bg-dim" min="0" max="80" value="20" class="setting-range">
+                    </div>
+                </div>
+
+                <div class="settings-row">
+                    <div class="settings-info-group">
+                        <span class="settings-row-label">Background Blur</span>
+                        <span class="settings-row-hint" id="bg-blur-label">0px</span>
+                    </div>
+                    <div class="setting-range-wrap">
+                        <input type="range" id="setting-bg-blur" min="0" max="20" value="0" class="setting-range">
+                    </div>
+                </div>
+
+                <!-- Tile Shape -->
+                <div class="settings-row">
+                    <div class="settings-info-group">
+                        <span class="settings-row-label">Tile Shape</span>
+                        <span class="settings-row-hint">Shortcut icon borders</span>
+                    </div>
+                    <div class="segment-group" id="tile-shape-group">
+                        <button class="segment-btn active" data-shape="circle" type="button">Circle</button>
+                        <button class="segment-btn" data-shape="squircle" type="button">Squircle</button>
+                        <button class="segment-btn" data-shape="square" type="button">Square</button>
+                    </div>
+                </div>
+
+                <!-- Show / Hide Shortcut Labels -->
+                <div class="settings-row">
+                    <div class="settings-info-group">
+                        <span class="settings-row-label">Shortcut Names</span>
+                        <span class="settings-row-hint">Display text below icons</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="setting-show-labels" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+            </div>
+
+            <div class="backup-divider"></div>
+
+            <!-- 2. Clock, Date & Profile -->
+            <div class="settings-section">
+                <h4 class="settings-section-title"><i class="fas fa-clock"></i> Clock, Date & Greeting</h4>
+                
+                <!-- Display Name -->
+                <div class="settings-row">
+                    <div class="settings-info-group">
+                        <span class="settings-row-label">Display Name</span>
+                        <span class="settings-row-hint">Greeting on dashboard</span>
+                    </div>
+                    <div class="settings-action-group">
+                        <input type="text" id="setting-user-name" placeholder="Your name" class="setting-text-input" autocomplete="off">
+                        <button class="modal-btn secondary btn-compact" id="setting-name-save-btn" type="button">
+                            Save
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 12h / 24h Time Format -->
+                <div class="settings-row">
+                    <div class="settings-info-group">
+                        <span class="settings-row-label">Time Format</span>
+                        <span class="settings-row-hint">Clock display style</span>
+                    </div>
+                    <div class="segment-group" id="time-format-group">
+                        <button class="segment-btn" data-time="12h" type="button">12-Hour</button>
+                        <button class="segment-btn active" data-time="24h" type="button">24-Hour</button>
+                    </div>
+                </div>
+
+                <!-- Show Seconds -->
+                <div class="settings-row">
+                    <div class="settings-info-group">
+                        <span class="settings-row-label">Show Seconds</span>
+                        <span class="settings-row-hint">Live ticking seconds</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="setting-show-seconds" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <!-- Date Format -->
+                <div class="settings-row">
+                    <div class="settings-info-group">
+                        <span class="settings-row-label">Date Format</span>
+                        <span class="settings-row-hint">Display beneath clock</span>
+                    </div>
+                    <div class="settings-action-group">
+                        <select id="setting-date-format" class="setting-select">
+                            <option value="dd/mm/yy" selected>DD/MM/YY (24/08/26)</option>
+                            <option value="mm/dd/yy">MM/DD/YY (08/24/26)</option>
+                            <option value="text">Text (Mon, 24 Aug)</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
             <div class="backup-divider"></div>
 
-            <!-- Import Section -->
-            <div class="backup-section">
-                <h4 class="backup-section-title"><i class="fas fa-file-import"></i> Restore / Import</h4>
-                <p class="backup-section-desc">Upload or drag & drop a backup JSON file from your computer or another user/browser.</p>
+            <!-- 3. Search Section -->
+            <div class="settings-section">
+                <h4 class="settings-section-title"><i class="fas fa-magnifying-glass"></i> Search Engine</h4>
                 
-                <input type="file" id="backup-file-input" accept=".json,application/json" style="display: none;">
-                
-                <div class="backup-dropzone" id="backup-dropzone">
-                    <i class="fas fa-cloud-arrow-up dropzone-icon"></i>
-                    <span class="dropzone-text">Click to browse or drop JSON file here</span>
-                    <span class="dropzone-subtext">Supports HomeDesk backup files (*.json)</span>
+                <!-- Default Search Engine -->
+                <div class="settings-row">
+                    <div class="settings-info-group">
+                        <span class="settings-row-label">Default Engine</span>
+                        <span class="settings-row-hint">Initial search provider</span>
+                    </div>
+                    <div class="settings-action-group">
+                        <select id="setting-default-engine" class="setting-select">
+                            <option value="google" selected>Google</option>
+                            <option value="bing">Bing</option>
+                            <option value="duckduckgo">DuckDuckGo</option>
+                            <option value="youtube">YouTube</option>
+                            <option value="brave">Brave Search</option>
+                            <option value="startpage">Startpage</option>
+                        </select>
+                    </div>
+                </div>
+
+
+            </div>
+
+            <div class="backup-divider"></div>
+
+            <!-- 4. Backup & Reset Section -->
+            <div class="settings-section">
+                <h4 class="settings-section-title"><i class="fas fa-database"></i> Backup & Reset</h4>
+                <div class="settings-row">
+                    <div class="settings-info-group">
+                        <span class="settings-row-label">Dashboard Data</span>
+                        <span class="settings-row-hint">Grids, shortcuts & settings</span>
+                    </div>
+                    <div class="settings-action-group">
+                        <button class="modal-btn secondary btn-compact" id="export-json-btn" type="button" title="Download backup JSON">
+                            <i class="fas fa-download"></i> Export
+                        </button>
+                        <input type="file" id="backup-file-input" accept=".json,application/json" style="display: none;">
+                        <button class="modal-btn secondary btn-compact" id="import-json-btn" type="button" title="Import / Restore from JSON file">
+                            <i class="fas fa-file-import"></i> Import
+                        </button>
+                        <button class="modal-btn ghost btn-compact" id="copy-json-btn" type="button" title="Copy JSON text to clipboard">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Preview of selected file -->
@@ -146,11 +305,21 @@
                             <span><strong>Merge</strong> (Appends to current grids)</span>
                         </label>
                     </div>
+                    <div class="modal-actions import-actions" style="margin-top: 8px;">
+                        <button class="modal-btn confirm btn-compact" id="import-confirm-btn" type="button">
+                            <i class="fas fa-rotate-left"></i> Confirm Restore
+                        </button>
+                    </div>
                 </div>
 
-                <div class="modal-actions import-actions">
-                    <button class="modal-btn confirm" id="import-confirm-btn" type="button" disabled>
-                        <i class="fas fa-rotate-left"></i> Restore Data
+                <!-- Factory Reset Row -->
+                <div class="settings-row" style="margin-top: 6px; border-color: rgba(234, 67, 53, 0.25); background: rgba(234, 67, 53, 0.06);">
+                    <div class="settings-info-group">
+                        <span class="settings-row-label" style="color: #ff6b6b;">Factory Reset</span>
+                        <span class="settings-row-hint">Reset all data & start fresh</span>
+                    </div>
+                    <button class="modal-btn danger btn-compact" id="factory-reset-btn" type="button">
+                        <i class="fas fa-trash-can"></i> Reset All
                     </button>
                 </div>
             </div>

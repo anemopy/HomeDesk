@@ -29,22 +29,32 @@
 - **Context Menu Editing**: Right-click any shortcut icon to edit its destination URL, icon, or display label.
 - **Smart Responsive Layout**: Dynamically balances grid panels across top and bottom rows based on your viewport and count.
 
+### 🖼️ Appearance & Visual Customization
+- **Upload Custom Background**: Upload any local image file (JPG, PNG, WebP) with automatic canvas downsampling & optimization.
+- **Dim & Blur Sliders**: Fine-tune background brightness (0–80%) and backdrop blur (0–20px) for optimal contrast.
+- **Tile Shapes**: Switch shortcut tiles between **Circle**, **Squircle** (Apple-style rounded squircle), or **Square**.
+- **Minimalist Mode**: Toggle website text titles on/off for an icon-only clean aesthetic.
+
 ### 🔍 Multi-Engine Search Bar
 - **Instant Engine Switching**: Seamlessly toggle between **Google**, **Bing**, **DuckDuckGo**, **YouTube**, **Brave Search**, and **Startpage**.
+- **Default Engine Persistence**: Changing engine from the search dropdown or Settings modal automatically saves and syncs across restarts.
 - **Type-to-Search**: Start typing anywhere on the page without clicking to automatically focus the search bar.
 
-### 🌐 Smart Multi-Source Favicons & Offline Caching
-- **Multi-Source Fetcher**: Resolves website icons via Direct Site Favicons, Google FaviconV2, DuckDuckGo Icons, Icon Horse, Clearbit Logo HD, FaviconKit, Yandex, or Font Awesome icons.
-- **Automatic Offline Caching**: Converts fetched favicons to Base64 `data:` URIs via an HTML5 canvas, ensuring your shortcuts load instantly even without an internet connection.
+### ⏰ Clock, Date & Greeting Controls
+- **12-Hour vs 24-Hour**: Toggle between `02:30 PM` and `14:30:00`.
+- **Show / Hide Seconds**: Minimalist time or live-ticking seconds.
+- **Date Formats**: Switch between `DD/MM/YY`, `MM/DD/YY`, or expanded `Text` format (e.g. *Mon, 24 Aug*).
+- **Display Name Editor**: Update your greeting nickname directly in settings.
 
-### 💾 One-Click Backup & Restore
-- **JSON Export**: Download a timestamped `.json` backup file or copy the raw payload directly to your clipboard.
-- **Flexible Restore**: Drag and drop or browse backup files with live previews (grid count, shortcut count, user name).
-- **Import Modes**: Choose between **Replace** (full restore) or **Merge** (appends imported grids to current setup).
+### 🖱️ Shortcut Interactions
+- **Single Click**: Opens website in the current tab.
+- **Double Click**: Opens website in a new tab (`_blank`).
+- **Right Click**: Opens full shortcut editor (rename, custom FA icon, or image URL).
 
-### ⏰ Live Digital Clock & Custom Greeting
-- Real-time digital clock with 24-hour time and localized date display.
-- Personalized greeting on your first visit with dynamic title updates.
+### 💾 Backup, Restore & Factory Reset
+- **JSON Export & Sync**: Download timestamped `.json` backups or copy directly to clipboard with full settings preservation.
+- **Flexible Restore**: Choose between **Replace** (full restore) or **Merge** (appends imported grids).
+- **Factory Reset**: One-click safe wipe to reset all settings, wallpaper, and shortcuts back to clean defaults.
 
 ---
 
@@ -52,7 +62,7 @@
 
 ```
 +-------------------------------------------------------------------------+
-| [⇄ Backup & Restore]                                   [+ Add Grid]    |
+| [⚙ Settings]                                           [+ Add Grid]    |
 |                                                                         |
 |  +--------------------+  +--------------------+  +--------------------+ |
 |  |     WORK (3x3)     |  |    SOCIAL (3x3)    |  |     DEV (3x3)      | |
