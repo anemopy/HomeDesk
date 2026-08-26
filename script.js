@@ -83,6 +83,11 @@
 
     const gridsTopContainer = document.getElementById('grids-top');
     const gridsBottomContainer = document.getElementById('grids-bottom');
+    const editGridBtn = document.getElementById('edit-grid-btn');
+
+    // Dashboard Edit Mode & Slot Placement
+    let isDashboardEditing = false;
+    let targetGridSlotForAdd = -1;
 
     // Track which panel & slot we're adding/editing
     let addTarget = { panelIndex: -1, editIndex: -1 };
@@ -92,12 +97,26 @@
     // ── Data Layer ──────────────────────────────
     function loadData() {
         const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) return JSON.parse(stored);
+        if (stored) {
+            try { return JSON.parse(stored); } catch (e) { }
+        }
         return null;
     }
 
     function saveData(data) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        // Sync with extension storage for background context menus
+        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+            chrome.storage.local.set({ [STORAGE_KEY]: data }, function () {
+                if (chrome.runtime && chrome.runtime.sendMessage) {
+                    try {
+                        chrome.runtime.sendMessage({ type: 'UPDATE_CONTEXT_MENUS' }, function () {
+                            if (chrome.runtime.lastError) { /* ignore */ }
+                        });
+                    } catch (e) { }
+                }
+            });
+        }
     }
 
     function getUserName() {
@@ -147,11 +166,81 @@
         }
     }
 
+    // ── Smart Slot Assignment ───────────────────
+    function assignDefaultSlots(data) {
+        if (!Array.isArray(data)) return;
+        var usedSlots = new Set();
+        data.forEach(function (p) {
+            if (typeof p.slot === 'number' && p.slot >= 0 && p.slot < 10 && !usedSlots.has(p.slot)) {
+                usedSlots.add(p.slot);
+            } else {
+                delete p.slot;
+            }
+        });
+
+        var count = data.length;
+        var defaultPresets = {
+            1: [2],
+            2: [1, 3],
+            3: [1, 2, 3],
+            4: [0, 1, 2, 3],
+            5: [0, 1, 2, 3, 4],
+            6: [0, 1, 2, 3, 4, 7],
+            7: [0, 1, 2, 3, 4, 6, 8],
+            8: [0, 1, 2, 3, 4, 6, 7, 8],
+            9: [0, 1, 2, 3, 4, 5, 6, 7, 8],
+            10: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        };
+
+        var allHaveSlots = data.every(function (p) { return typeof p.slot === 'number'; });
+        if (!allHaveSlots) {
+            var presets = defaultPresets[count] || [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+            data.forEach(function (p, idx) {
+                if (typeof p.slot !== 'number') {
+                    var pref = presets[idx];
+                    if (typeof pref === 'number' && !usedSlots.has(pref)) {
+                        p.slot = pref;
+                        usedSlots.add(pref);
+                    } else {
+                        for (var s = 0; s < 10; s++) {
+                            if (!usedSlots.has(s)) {
+                                p.slot = s;
+                                usedSlots.add(s);
+                                break;
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
+
     // ── Grid Rendering ──────────────────────────
-    function createPanelElement(panelData, panelIndex, totalPanels) {
+    function createPanelElement(panelData, panelIndex, totalPanels, slotIndex) {
         var section = document.createElement('section');
         section.className = 'shortcut-panel';
         section.dataset.panelIndex = panelIndex;
+        section.dataset.slotIndex = slotIndex;
+
+        // In Dashboard Edit Mode, make whole panel draggable between slots
+        if (isDashboardEditing) {
+            section.setAttribute('draggable', 'true');
+
+            section.addEventListener('dragstart', function (e) {
+                e.stopPropagation();
+                e.dataTransfer.setData('application/grid-slot', slotIndex.toString());
+                e.dataTransfer.effectAllowed = 'move';
+                section.classList.add('dragging-grid');
+            });
+
+            section.addEventListener('dragend', function (e) {
+                e.stopPropagation();
+                section.classList.remove('dragging-grid');
+                document.querySelectorAll('.slot-drag-over').forEach(function (el) {
+                    el.classList.remove('slot-drag-over');
+                });
+            });
+        }
 
         // Header with editable name
         var h3 = document.createElement('h3');
@@ -197,50 +286,30 @@
         grid.className = 'icon-grid';
         section.appendChild(grid);
 
-        // Render items
-        renderPanel(section, panelIndex, panelData.items, false);
+        // Render items (master edit mode controls editing state across all panels)
+        renderPanel(section, panelIndex, panelData.items, isDashboardEditing);
 
-        // Edit button
-        var editBtn = document.createElement('button');
-        editBtn.className = 'edit-toggle';
-        editBtn.type = 'button';
-        editBtn.title = 'Edit shortcuts';
-        editBtn.innerHTML = '<i class="fas fa-pen"></i>';
+        // Delete grid button on top of grid (prominent in Dashboard Edit Mode)
+        var deleteBtn = document.createElement('button');
+        deleteBtn.className = 'grid-delete-btn';
+        deleteBtn.type = 'button';
+        deleteBtn.title = 'Delete this grid';
+        deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
 
-        editBtn.addEventListener('click', function (e) {
+        deleteBtn.addEventListener('click', function (e) {
             e.stopPropagation();
-            var isEditing = section.classList.toggle('editing');
-            editBtn.classList.toggle('active', isEditing);
-            editBtn.innerHTML = isEditing
-                ? '<i class="fas fa-check"></i>'
-                : '<i class="fas fa-pen"></i>';
-
+            if (!confirm('Delete "' + (panelData.name || 'this grid') + '" and all its shortcuts?')) return;
             var data = loadData();
-            if (data && data[panelIndex]) {
-                renderPanel(section, panelIndex, data[panelIndex].items, isEditing);
-            }
-        });
-        section.appendChild(editBtn);
-
-        // Delete grid button (only if more than 1 grid)
-        if (totalPanels > 1) {
-            var deleteBtn = document.createElement('button');
-            deleteBtn.className = 'grid-delete-btn';
-            deleteBtn.type = 'button';
-            deleteBtn.title = 'Delete this grid';
-            deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
-
-            deleteBtn.addEventListener('click', function (e) {
-                e.stopPropagation();
-                if (!confirm('Delete "' + (panelData.name || 'this grid') + '" and all its shortcuts?')) return;
-                var data = loadData();
-                if (!data) return;
-                data.splice(panelIndex, 1);
+            if (!data) return;
+            var idx = data.findIndex(function (p) { return p.slot === slotIndex; });
+            if (idx >= 0) {
+                data.splice(idx, 1);
                 saveData(data);
                 renderAllGrids();
-            });
-            section.appendChild(deleteBtn);
-        }
+                showToast('Grid deleted', 'info');
+            }
+        });
+        section.appendChild(deleteBtn);
 
         return section;
     }
@@ -370,6 +439,7 @@
 
                 (function (pi, si) {
                     div.addEventListener('dragstart', function (e) {
+                        e.stopPropagation(); // Don't drag parent grid
                         e.dataTransfer.effectAllowed = 'move';
                         e.dataTransfer.setData('text/plain', String(si));
                         e.dataTransfer.setData('application/panel-index', String(pi));
@@ -377,9 +447,10 @@
                         setTimeout(function () { self.classList.add('dragging'); }, 0);
                     });
 
-                    div.addEventListener('dragend', function () {
+                    div.addEventListener('dragend', function (e) {
+                        e.stopPropagation();
                         this.classList.remove('dragging');
-                        grid.querySelectorAll('.drag-over').forEach(function (el) {
+                        document.querySelectorAll('.site-item.drag-over, .add-slot.drag-over').forEach(function (el) {
                             el.classList.remove('drag-over');
                         });
                     });
@@ -402,19 +473,46 @@
 
                     div.addEventListener('drop', function (e) {
                         e.preventDefault();
+                        e.stopPropagation();
                         this.classList.remove('drag-over');
-                        var fromPanel = parseInt(e.dataTransfer.getData('application/panel-index'));
-                        var fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
+
+                        var fromPanel = parseInt(e.dataTransfer.getData('application/panel-index'), 10);
+                        var fromIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
                         var toIndex = si;
-                        if (fromPanel !== pi || fromIndex === toIndex) return;
+
+                        if (isNaN(fromPanel) || isNaN(fromIndex)) return;
 
                         var data = loadData();
-                        if (!data || !data[pi]) return;
-                        var arr = data[pi].items;
-                        var moved = arr.splice(fromIndex, 1)[0];
-                        arr.splice(toIndex, 0, moved);
-                        saveData(data);
-                        renderPanel(panel, pi, arr, true);
+                        if (!data || !data[fromPanel] || !data[pi]) return;
+
+                        if (fromPanel === pi) {
+                            // Reorder inside SAME grid
+                            if (fromIndex === toIndex) return;
+                            var arr = data[pi].items;
+                            var moved = arr.splice(fromIndex, 1)[0];
+                            arr.splice(toIndex, 0, moved);
+                            saveData(data);
+                            renderPanel(panel, pi, arr, true);
+                        } else {
+                            // Move or Swap ACROSS DIFFERENT grids
+                            var sourceArr = data[fromPanel].items;
+                            var targetArr = data[pi].items;
+                            var movedItem = sourceArr.splice(fromIndex, 1)[0];
+
+                            if (targetArr.length >= MAX_ITEMS) {
+                                // Target grid is full -> swap positions
+                                var swappedItem = targetArr.splice(toIndex, 1, movedItem)[0];
+                                sourceArr.splice(fromIndex, 0, swappedItem);
+                                showToast('Swapped shortcuts between grids', 'info');
+                            } else {
+                                // Target grid has space -> insert at toIndex
+                                targetArr.splice(toIndex, 0, movedItem);
+                                showToast('Moved shortcut to ' + (data[pi].name || 'grid'), 'success');
+                            }
+
+                            saveData(data);
+                            renderAllGrids();
+                        }
                     });
                 })(panelIndex, slotIndex);
             }
@@ -431,9 +529,47 @@
                     addDiv.innerHTML =
                         '<div class="add-circle"><i class="fas fa-plus"></i></div>' +
                         '<span class="add-label">Add</span>';
+
                     addDiv.addEventListener('click', function () {
                         openAddModal(panelIndex);
                     });
+
+                    // Allow dropping a shortcut onto an empty Add slot from ANY grid
+                    addDiv.addEventListener('dragover', function (e) {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                    });
+                    addDiv.addEventListener('dragenter', function (e) {
+                        e.preventDefault();
+                        addDiv.classList.add('drag-over');
+                    });
+                    addDiv.addEventListener('dragleave', function () {
+                        addDiv.classList.remove('drag-over');
+                    });
+                    addDiv.addEventListener('drop', function (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        addDiv.classList.remove('drag-over');
+
+                        var fromPanel = parseInt(e.dataTransfer.getData('application/panel-index'), 10);
+                        var fromIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
+                        if (isNaN(fromPanel) || isNaN(fromIndex)) return;
+
+                        var data = loadData();
+                        if (!data || !data[fromPanel] || !data[panelIndex]) return;
+
+                        if (data[panelIndex].items.length >= MAX_ITEMS) {
+                            showToast('Target grid is full', 'error');
+                            return;
+                        }
+
+                        var movedItem = data[fromPanel].items.splice(fromIndex, 1)[0];
+                        data[panelIndex].items.push(movedItem);
+                        saveData(data);
+                        renderAllGrids();
+                        showToast('Moved shortcut to ' + (data[panelIndex].name || 'grid'), 'success');
+                    });
+
                     grid.appendChild(addDiv);
                 })(s);
             }
@@ -444,46 +580,97 @@
         var data = loadData();
         if (!data) return;
 
+        assignDefaultSlots(data);
+        saveData(data);
+
         gridsTopContainer.innerHTML = '';
         gridsBottomContainer.innerHTML = '';
 
         var totalPanels = data.length;
+        var hasBottomGrids = data.some(function (p) { return p.slot >= 5 && p.slot <= 9; });
 
-        data.forEach(function (panelData, i) {
-            var el = createPanelElement(panelData, i, totalPanels);
+        function createSlotElement(slotNumber) {
+            var slotDiv = document.createElement('div');
+            slotDiv.className = 'grid-slot-placeholder';
+            slotDiv.dataset.slot = slotNumber;
 
-            // First half goes top, second half goes bottom
-            // With dynamic grids, we split evenly
-            var half = Math.ceil(totalPanels / 2);
-            if (totalPanels <= 5) {
-                // If 5 or fewer, all go on top row
-                gridsTopContainer.appendChild(el);
+            var panelData = data.find(function (p) { return p.slot === slotNumber; });
+
+            if (panelData) {
+                var panelIdx = data.indexOf(panelData);
+                var panelEl = createPanelElement(panelData, panelIdx, totalPanels, slotNumber);
+                slotDiv.appendChild(panelEl);
             } else {
-                if (i < half) {
-                    gridsTopContainer.appendChild(el);
-                } else {
-                    gridsBottomContainer.appendChild(el);
+                slotDiv.classList.add('empty-slot');
+                slotDiv.innerHTML = '<div class="slot-hint"><i class="fas fa-plus"></i><span>Slot ' + (slotNumber + 1) + '</span></div>';
+
+                if (isDashboardEditing) {
+                    slotDiv.addEventListener('click', function () {
+                        targetGridSlotForAdd = slotNumber;
+                        openAddGridModal();
+                    });
                 }
             }
-        });
 
-        // Update grid layout columns based on panel count
-        updateGridLayout(totalPanels);
-    }
+            // Drag and Drop listeners on all slots (empty or occupied)
+            slotDiv.addEventListener('dragover', function (e) {
+                if (!isDashboardEditing) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+            });
 
-    function updateGridLayout(totalPanels) {
-        var topCount = totalPanels <= 5 ? totalPanels : Math.ceil(totalPanels / 2);
-        var bottomCount = totalPanels <= 5 ? 0 : totalPanels - topCount;
+            slotDiv.addEventListener('dragenter', function (e) {
+                if (!isDashboardEditing) return;
+                e.preventDefault();
+                slotDiv.classList.add('slot-drag-over');
+            });
 
-        var maxCols = Math.max(topCount, bottomCount, 1);
+            slotDiv.addEventListener('dragleave', function () {
+                if (!isDashboardEditing) return;
+                slotDiv.classList.remove('slot-drag-over');
+            });
 
-        // Update CSS variable for panel sizing
-        document.documentElement.style.setProperty('--grid-cols', maxCols);
+            slotDiv.addEventListener('drop', function (e) {
+                if (!isDashboardEditing) return;
+                e.preventDefault();
+                slotDiv.classList.remove('slot-drag-over');
 
-        // Update the grids-area grid template
-        gridsTopContainer.style.gridTemplateColumns = 'repeat(' + topCount + ', 1fr)';
-        if (bottomCount > 0) {
-            gridsBottomContainer.style.gridTemplateColumns = 'repeat(' + bottomCount + ', 1fr)';
+                var fromSlotStr = e.dataTransfer.getData('application/grid-slot');
+                if (!fromSlotStr && fromSlotStr !== '0') return;
+                var fromSlot = parseInt(fromSlotStr, 10);
+                var targetSlot = slotNumber;
+                if (fromSlot === targetSlot) return;
+
+                var currData = loadData();
+                if (!currData) return;
+
+                var sourceP = currData.find(function (p) { return p.slot === fromSlot; });
+                var targetP = currData.find(function (p) { return p.slot === targetSlot; });
+
+                if (sourceP) {
+                    sourceP.slot = targetSlot;
+                    if (targetP) {
+                        targetP.slot = fromSlot;
+                    }
+                    saveData(currData);
+                    renderAllGrids();
+                }
+            });
+
+            return slotDiv;
+        }
+
+        // Render Top Row (Slots 0..4)
+        for (var sTop = 0; sTop < 5; sTop++) {
+            gridsTopContainer.appendChild(createSlotElement(sTop));
+        }
+
+        // Render Bottom Row (Slots 5..9)
+        for (var sBot = 5; sBot < 10; sBot++) {
+            gridsBottomContainer.appendChild(createSlotElement(sBot));
+        }
+
+        if (hasBottomGrids || isDashboardEditing) {
             gridsBottomContainer.style.display = 'grid';
         } else {
             gridsBottomContainer.style.display = 'none';
@@ -499,7 +686,7 @@
         // Re-render just this panel
         var panels = document.querySelectorAll('.shortcut-panel[data-panel-index="' + panelIndex + '"]');
         if (panels.length > 0) {
-            renderPanel(panels[0], panelIndex, data[panelIndex].items, true);
+            renderPanel(panels[0], panelIndex, data[panelIndex].items, isDashboardEditing);
         }
     }
 
@@ -528,16 +715,16 @@
         addTarget.panelIndex = panelIndex;
         addTarget.editIndex = slotIndex;
         modalUrl.value = item.url || '';
-        modalName.value = '';
-        modalIcon.value = '';
+        modalName.value = item.name || '';
+        modalIcon.value = item.icon || '';
         if (modalTitle) modalTitle.textContent = 'Edit Shortcut';
         if (modalConfirm) modalConfirm.textContent = 'Save';
-        if (modalNameField) modalNameField.style.display = 'none';
-        if (modalIconField) modalIconField.style.display = 'none';
+        if (modalNameField) modalNameField.style.display = '';
+        if (modalIconField) modalIconField.style.display = '';
         if (modalSourceField) modalSourceField.style.display = '';
         if (modalIconSource) modalIconSource.value = 'direct';
         modal.classList.add('open');
-        setTimeout(function () { modalUrl.focus(); }, 100);
+        setTimeout(function () { modalName.focus(); modalName.select(); }, 100);
     }
 
     function closeModal() {
@@ -620,8 +807,7 @@
             // Re-render the specific panel
             var panels = document.querySelectorAll('.shortcut-panel[data-panel-index="' + pi + '"]');
             if (panels.length > 0) {
-                var isEditing = panels[0].classList.contains('editing');
-                renderPanel(panels[0], pi, panelData.items, isEditing);
+                renderPanel(panels[0], pi, panelData.items, isDashboardEditing);
             }
             closeModal();
         }
@@ -712,13 +898,63 @@
     function confirmAddGrid() {
         var name = gridNameInput.value.trim() || 'New Grid';
         var data = loadData() || [];
-        data.push({ name: name, items: [] });
-        saveData(data);
-        closeAddGridModal();
-        renderAllGrids();
+
+        if (data.length >= 10) {
+            closeAddGridModal();
+            showToast('Maximum 10 grids reached', 'error');
+            return;
+        }
+
+        assignDefaultSlots(data);
+
+        var slotToAssign = -1;
+        var usedSlots = new Set(data.map(function (p) { return p.slot; }));
+
+        if (targetGridSlotForAdd >= 0 && !usedSlots.has(targetGridSlotForAdd)) {
+            slotToAssign = targetGridSlotForAdd;
+        } else {
+            for (var s = 0; s < 10; s++) {
+                if (!usedSlots.has(s)) {
+                    slotToAssign = s;
+                    break;
+                }
+            }
+        }
+        targetGridSlotForAdd = -1;
+
+        if (slotToAssign >= 0) {
+            data.push({ name: name, items: [], slot: slotToAssign });
+            saveData(data);
+            closeAddGridModal();
+            renderAllGrids();
+            showToast('Grid added to Slot ' + (slotToAssign + 1), 'success');
+        }
     }
 
-    if (addGridBtn) addGridBtn.addEventListener('click', openAddGridModal);
+    // ── Dashboard Edit Mode Toggle ───────────────
+    function toggleDashboardEdit() {
+        isDashboardEditing = !isDashboardEditing;
+        document.body.classList.toggle('dashboard-editing', isDashboardEditing);
+        if (editGridBtn) {
+            editGridBtn.classList.toggle('active', isDashboardEditing);
+            editGridBtn.innerHTML = isDashboardEditing
+                ? '<i class="fas fa-check"></i>'
+                : '<i class="fas fa-pen"></i>';
+            editGridBtn.title = isDashboardEditing ? 'Done Editing Layout' : 'Edit Grid Layout';
+        }
+        renderAllGrids();
+        if (isDashboardEditing) {
+            showToast('✏️ Edit Mode: Drag grids into any slot, or click 🗑️ to delete', 'info');
+        } else {
+            showToast('Grid layout saved!', 'success');
+        }
+    }
+
+    if (editGridBtn) editGridBtn.addEventListener('click', toggleDashboardEdit);
+    if (addGridBtn) addGridBtn.addEventListener('click', function () {
+        targetGridSlotForAdd = -1;
+        openAddGridModal();
+    });
     if (gridModalConfirm) gridModalConfirm.addEventListener('click', confirmAddGrid);
     if (gridModalCancel) gridModalCancel.addEventListener('click', closeAddGridModal);
     if (addGridModal) {
@@ -1452,6 +1688,35 @@
         renderAllGrids();
         initClock();
         cacheAllFavicons();
+
+        // Listen for storage changes from Background Service Worker (e.g. added via right-click)
+        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
+            chrome.storage.onChanged.addListener(function (changes, areaName) {
+                if (areaName === 'local' && changes[STORAGE_KEY]) {
+                    var newData = changes[STORAGE_KEY].newValue;
+                    if (newData && Array.isArray(newData)) {
+                        localStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
+                        renderAllGrids();
+                    }
+                }
+            });
+        }
+
+        // Initial sync from chrome.storage.local if available
+        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+            chrome.storage.local.get([STORAGE_KEY], function (res) {
+                var extData = res[STORAGE_KEY];
+                var localData = loadData();
+                if (extData && Array.isArray(extData) && extData.length > 0) {
+                    if (!localData || JSON.stringify(localData) !== JSON.stringify(extData)) {
+                        localStorage.setItem(STORAGE_KEY, JSON.stringify(extData));
+                        renderAllGrids();
+                    }
+                } else if (localData && localData.length > 0) {
+                    chrome.storage.local.set({ [STORAGE_KEY]: localData });
+                }
+            });
+        }
     }
 
     if (document.readyState === 'loading') {

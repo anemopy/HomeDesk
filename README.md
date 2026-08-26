@@ -49,7 +49,12 @@
 ### 🖱️ Shortcut Interactions
 - **Single Click**: Opens website in the current tab.
 - **Double Click**: Opens website in a new tab (`_blank`).
-- **Right Click**: Opens full shortcut editor (rename, custom FA icon, or image URL).
+- **Right Click on Dashboard**: Opens full shortcut editor (rename, custom FA icon, or image URL).
+
+### 🌐 Right-Click Anywhere to Add Site
+- **Browser Context Menu**: While browsing ANY website (e.g. `google.com`), right-click the page or any link -> select **"📌 Add to HomeDesk"** -> pick the destination grid.
+- **Auto-Favicon & Title**: Automatically extracts the page title, clean domain name, and high-res favicon.
+- **Real-Time Sync**: Instant cross-tab sync so your HomeDesk dashboard updates live.
 
 ### 💾 Backup, Restore & Factory Reset
 - **JSON Export & Sync**: Download timestamped `.json` backups or copy directly to clipboard with full settings preservation.

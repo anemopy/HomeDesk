@@ -48,20 +48,90 @@ body {
     gap: var(--grid-gap);
     width: 100%;
     min-height: 100vh;
-    padding: var(--page-padding);
+    padding: clamp(3.2rem, 5.5vh, 4rem) var(--page-padding) clamp(1.2rem, 2.5vh, 2rem);
     box-sizing: border-box;
 }
 
-/* Dynamic grids area */
+/* 10-Slot Grid Layout System (5 columns top, 5 columns bottom) */
 .grids-area {
     display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: var(--grid-gap);
     width: 100%;
-    justify-items: center;
+    max-width: 1280px;
+    box-sizing: border-box;
+    align-items: stretch;
 }
 
 #grids-bottom {
-    /* no extra styles needed */
+    /* Shown when bottom slots occupied or in edit mode */
+}
+
+/* Grid Slot Placeholders (1 to 10) */
+.grid-slot-placeholder {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border-radius: 14px;
+    display: flex;
+    align-items: stretch;
+    justify-content: stretch;
+    box-sizing: border-box;
+    transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* In normal mode, empty slots are invisible and non-interactive */
+.grid-slot-placeholder.empty-slot {
+    pointer-events: none;
+    border: 2px dashed transparent;
+    background: transparent;
+}
+
+.grid-slot-placeholder.empty-slot .slot-hint {
+    display: none;
+}
+
+/* In Dashboard Edit Mode */
+body.dashboard-editing .grids-area {
+    display: grid !important;
+}
+
+body.dashboard-editing .grid-slot-placeholder.empty-slot {
+    pointer-events: auto;
+    border: 2px dashed rgba(255, 255, 255, 0.22);
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+body.dashboard-editing .grid-slot-placeholder.empty-slot:hover,
+body.dashboard-editing .grid-slot-placeholder.empty-slot.slot-drag-over {
+    border-color: rgba(66, 133, 244, 0.85);
+    background: rgba(66, 133, 244, 0.14);
+    transform: scale(1.02);
+    box-shadow: 0 0 20px rgba(66, 133, 244, 0.3);
+}
+
+body.dashboard-editing .grid-slot-placeholder.empty-slot .slot-hint {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    pointer-events: none;
+    user-select: none;
+}
+
+body.dashboard-editing .grid-slot-placeholder.empty-slot .slot-hint i {
+    font-size: 1.15rem;
+    color: rgba(255, 255, 255, 0.35);
 }
 
 .shortcut-panel {
@@ -78,10 +148,26 @@ body {
     overflow: hidden;
     padding: clamp(0.45rem, 0.8vmin, 0.9rem);
     position: relative;
-    transition: transform 0.25s ease, background 0.25s ease, border-color 0.25s ease;
+    transition: transform 0.25s ease, background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
     width: 100%;
-    max-width: calc((100vw - 6 * var(--grid-gap) - 2 * var(--page-padding)) / 5);
+    height: 100%;
     aspect-ratio: 1 / 1;
+}
+
+/* Draggable Grid in Edit Mode */
+body.dashboard-editing .shortcut-panel {
+    cursor: grab;
+    border-color: rgba(66, 133, 244, 0.45);
+    box-shadow: 0 0 0 1px rgba(66, 133, 244, 0.25), var(--grid-shadow);
+}
+
+body.dashboard-editing .shortcut-panel:active {
+    cursor: grabbing;
+}
+
+body.dashboard-editing .shortcut-panel.dragging-grid {
+    opacity: 0.3;
+    transform: scale(0.92);
 }
 
 .shortcut-panel::before {
@@ -99,7 +185,7 @@ body {
 .shortcut-panel:hover {
     background: rgba(255, 255, 255, 0.12);
     border-color: rgba(255, 255, 255, 0.4);
-    transform: translateY(-4px) scale(1.02);
+    transform: translateY(-3px) scale(1.01);
 }
 
 .shortcut-panel h3 {
@@ -225,96 +311,134 @@ body.hide-shortcut-labels .site-item {
     font-size: 0.6rem;
 }
 
-/* ---- Add Grid Button (floating) ---- */
+/* ---- Add Grid Button (floating top-right) ---- */
 .add-grid-btn {
     position: fixed;
-    top: 16px;
-    right: 16px;
-    width: 48px;
-    height: 48px;
-    border: 2px solid rgba(255, 255, 255, 0.2);
+    top: 14px;
+    right: 14px;
+    width: 36px;
+    height: 36px;
+    border: 1.5px solid rgba(255, 255, 255, 0.2);
     border-radius: 50%;
     background: rgba(30, 30, 30, 0.85);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     color: rgba(255, 255, 255, 0.8);
-    font-size: 1.1rem;
+    font-size: 0.95rem;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
     transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
     z-index: 100;
 }
 
 .add-grid-btn:hover {
-    transform: scale(1.12) rotate(90deg);
+    transform: scale(1.1) rotate(90deg);
     background: rgba(66, 133, 244, 0.3);
     border-color: rgba(66, 133, 244, 0.6);
     color: #ffffff;
 }
 
-/* ---- Settings Button (floating top-left) ---- */
-.backup-btn {
+/* ---- Edit Button (floating top-right near add button) ---- */
+.edit-grid-btn {
     position: fixed;
-    top: 16px;
-    left: 16px;
-    width: 48px;
-    height: 48px;
-    border: 2px solid rgba(255, 255, 255, 0.2);
+    top: 14px;
+    right: 56px;
+    width: 36px;
+    height: 36px;
+    border: 1.5px solid rgba(255, 255, 255, 0.2);
     border-radius: 50%;
     background: rgba(30, 30, 30, 0.85);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     color: rgba(255, 255, 255, 0.8);
-    font-size: 1.15rem;
+    font-size: 0.88rem;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+    transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
     z-index: 100;
 }
 
-.backup-btn:hover {
-    transform: scale(1.12) rotate(45deg);
+.edit-grid-btn:hover {
+    transform: scale(1.1);
     background: rgba(66, 133, 244, 0.3);
     border-color: rgba(66, 133, 244, 0.6);
     color: #ffffff;
 }
 
+.edit-grid-btn.active {
+    background: rgba(66, 133, 244, 0.4) !important;
+    border-color: #4285f4 !important;
+    color: #ffffff !important;
+    box-shadow: 0 0 16px rgba(66, 133, 244, 0.6) !important;
+    transform: scale(1.05);
+}
 
-/* ---- Grid Delete Button ---- */
-.grid-delete-btn {
-    position: absolute;
-    top: 8px;
-    left: 8px;
-    width: 24px;
-    height: 24px;
-    border: none;
+/* ---- Settings Button (floating top-left) ---- */
+.backup-btn {
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    width: 36px;
+    height: 36px;
+    border: 1.5px solid rgba(255, 255, 255, 0.2);
     border-radius: 50%;
-    background: rgba(234, 67, 53, 0.15);
-    color: rgba(234, 67, 53, 0.5);
-    font-size: 0.6rem;
+    background: rgba(30, 30, 30, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.95rem;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    opacity: 0;
-    transition: opacity 0.2s ease, background 0.2s ease, color 0.2s ease, transform 0.15s ease;
-    z-index: 5;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+    z-index: 100;
 }
 
-.shortcut-panel:hover .grid-delete-btn {
-    opacity: 1;
+.backup-btn:hover {
+    transform: scale(1.1) rotate(45deg);
+    background: rgba(66, 133, 244, 0.3);
+    border-color: rgba(66, 133, 244, 0.6);
+    color: #ffffff;
+}
+
+/* ---- Grid Delete Button (prominent in Dashboard Edit Mode) ---- */
+.grid-delete-btn {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: 26px;
+    height: 26px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(234, 67, 53, 0.88);
+    color: #ffffff;
+    font-size: 0.72rem;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    box-shadow: 0 2px 10px rgba(234, 67, 53, 0.4);
+    transition: opacity 0.2s ease, background 0.2s ease, color 0.2s ease, transform 0.15s ease;
+    z-index: 25;
+}
+
+body.dashboard-editing .grid-delete-btn {
+    display: flex !important;
+    opacity: 1 !important;
 }
 
 .grid-delete-btn:hover {
-    background: rgba(234, 67, 53, 0.85);
-    color: #ffffff;
-    transform: scale(1.15);
+    background: #ea4335;
+    transform: scale(1.2);
 }
 
 /* ---- Responsive ---- */
@@ -578,42 +702,7 @@ body.hide-shortcut-labels .site-item {
     background: rgba(255, 255, 255, 0.12);
 }
 
-/* ---- Edit Mode ---- */
-
-.edit-toggle {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    width: 26px;
-    height: 26px;
-    border: none;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.08);
-    color: var(--text-muted);
-    font-size: 0.7rem;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    transition: opacity 0.2s ease, background 0.2s ease, color 0.2s ease;
-    z-index: 5;
-}
-
-.shortcut-panel:hover .edit-toggle {
-    opacity: 1;
-}
-
-.edit-toggle:hover {
-    background: rgba(255, 255, 255, 0.2);
-    color: #ffffff;
-}
-
-.edit-toggle.active {
-    opacity: 1;
-    background: rgba(66, 133, 244, 0.3);
-    color: #4285f4;
-}
+/* ---- Edit Mode (controlled exclusively by master edit button) ---- */
 
 /* Delete button on each item */
 .item-delete {
@@ -621,20 +710,21 @@ body.hide-shortcut-labels .site-item {
     position: absolute;
     top: -4px;
     right: -4px;
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
     border: none;
     border-radius: 50%;
-    background: rgba(234, 67, 53, 0.85);
+    background: rgba(234, 67, 53, 0.9);
     color: #fff;
-    font-size: 0.55rem;
+    font-size: 0.6rem;
     cursor: pointer;
     align-items: center;
     justify-content: center;
-    z-index: 5;
+    z-index: 10;
     transition: transform 0.15s ease, background 0.15s ease;
     padding: 0;
     line-height: 1;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 
 .item-delete:hover {
@@ -642,33 +732,32 @@ body.hide-shortcut-labels .site-item {
     transform: scale(1.2);
 }
 
-.editing .site-item {
+body.dashboard-editing .site-item {
     position: relative;
     cursor: grab;
     transition: opacity 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.editing .item-delete {
+body.dashboard-editing .item-delete {
     display: flex;
 }
 
-/* Drag-and-drop reordering */
-
-.editing .site-item:active {
+body.dashboard-editing .site-item:active {
     cursor: grabbing;
 }
 
-.editing .site-item.dragging {
+body.dashboard-editing .site-item.dragging {
     opacity: 0.3;
     transform: scale(0.9);
 }
 
-.editing .site-item.drag-over {
+body.dashboard-editing .site-item.drag-over,
+.site-item.drag-over {
     transform: scale(1.08);
     box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.7),
                 0 0 16px rgba(66, 133, 244, 0.3);
     border-radius: 12px;
-    background: rgba(66, 133, 244, 0.1);
+    background: rgba(66, 133, 244, 0.15);
 }
 
 /* Add slot button */
@@ -693,13 +782,16 @@ body.hide-shortcut-labels .site-item {
     justify-content: center;
     color: rgba(255, 255, 255, 0.35);
     font-size: clamp(0.8rem, 2vmin, 1.5rem);
-    transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease, border-radius 0.2s ease;
+    transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease, border-radius 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.add-slot:hover .add-circle {
-    border-color: rgba(66, 133, 244, 0.6);
+.add-slot:hover .add-circle,
+.add-slot.drag-over .add-circle {
+    border-color: rgba(66, 133, 244, 0.85);
     color: #4285f4;
-    background: rgba(66, 133, 244, 0.08);
+    background: rgba(66, 133, 244, 0.2);
+    transform: scale(1.08);
+    box-shadow: 0 0 16px rgba(66, 133, 244, 0.35);
 }
 
 .add-slot .add-label {
